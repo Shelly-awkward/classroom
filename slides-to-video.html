@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>簡報 + 錄音 → 影片</title>
+<style>
+  :root {
+    --bg: #0f1720;
+    --panel: #1b2530;
+    --panel2: #222f3d;
+    --line: #33414f;
+    --text: #e7edf3;
+    --muted: #93a3b3;
+    --accent: #4f9df7;
+    --accent2: #2f7de0;
+    --ok: #46c07a;
+    --warn: #e6a23c;
+    --err: #e05a5a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  header {
+    padding: 20px 24px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { margin: 0 0 4px; font-size: 20px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  .steps { display: flex; gap: 8px; margin: 18px 0 22px; flex-wrap: wrap; }
+  .step-chip {
+    font-size: 13px; padding: 6px 12px; border-radius: 999px;
+    background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+  }
+  .step-chip.active { background: var(--accent2); color: #fff; border-color: var(--accent); }
+  .step-chip.done { color: var(--ok); border-color: var(--ok); }
+
+  section.card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px; margin-bottom: 20px;
+  }
+  section.card.disabled { opacity: .45; pointer-events: none; }
+  h2 { margin: 0 0 14px; font-size: 16px; }
+
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: 10px; padding: 22px;
+    text-align: center; cursor: pointer; transition: .15s; background: var(--panel2);
+  }
+  .drop:hover, .drop.over { border-color: var(--accent); background: #26333f; }
+  .drop .name { color: var(--ok); font-size: 13px; margin-top: 6px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+  button {
+    font-family: inherit; font-size: 14px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    padding: 9px 16px; border-radius: 8px; transition: .12s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent2); border-color: var(--accent); color: #fff; }
+  button.primary:hover:not(:disabled) { background: var(--accent); }
+  button.big { font-size: 17px; padding: 14px 28px; }
+
+  .previewbox {
+    background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 16/9;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .previewbox canvas, .previewbox img { max-width: 100%; max-height: 100%; display: block; }
+
+  .cue-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 14px 0; }
+  audio { width: 100%; margin-top: 8px; }
+  .pageinfo { font-size: 13px; color: var(--muted); }
+  .pageinfo b { color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td input {
+    width: 90px; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px; padding: 4px 8px; font-family: inherit;
+  }
+  td input:disabled { opacity: .5; }
+
+  .msg { font-size: 13px; padding: 8px 12px; border-radius: 8px; margin-top: 10px; display: none; }
+  .msg.show { display: block; }
+  .msg.warn { background: rgba(230,162,60,.15); color: var(--warn); border: 1px solid rgba(230,162,60,.4); }
+  .msg.err { background: rgba(224,90,90,.15); color: var(--err); border: 1px solid rgba(224,90,90,.4); }
+  .msg.ok { background: rgba(70,192,122,.15); color: var(--ok); border: 1px solid rgba(70,192,122,.4); }
+
+  .opts { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 13px; }
+  .opts label { color: var(--muted); }
+  select {
+    background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 6px; padding: 5px 8px; font-family: inherit; margin-left: 6px;
+  }
+  .progress { height: 8px; background: var(--panel2); border-radius: 999px; overflow: hidden; margin: 12px 0; }
+  .progress > div { height: 100%; width: 0; background: var(--accent); transition: width .1s linear; }
+  .dl { display: inline-block; margin-top: 10px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>簡報 + 錄音 → 影片</h1>
+  <p>把一份 PDF 簡報和一整段錄音，在瀏覽器裡合成影片（WebM）。檔案完全不上傳，全部在你的電腦本機處理。建議用 Chrome / Edge。</p>
+</header>
+
+<div class="wrap">
+  <div class="steps">
+    <span class="step-chip active" id="chip1">1 · 載入檔案</span>
+    <span class="step-chip" id="chip2">2 · 邊聽邊點換頁</span>
+    <span class="step-chip" id="chip3">3 · 輸出影片</span>
+  </div>
+
+  <!-- STEP 1 -->
+  <section class="card" id="card1">
+    <h2>1 · 載入 PDF 與錄音</h2>
+    <div class="grid2">
+      <div class="drop" id="dropPdf">
+        <div>📄 拖入或點選 <b>PDF 簡報</b></div>
+        <div class="name" id="pdfName"></div>
+        <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden>
+      </div>
+      <div class="drop" id="dropAudio">
+        <div>🎙️ 拖入或點選 <b>錄音檔</b>（mp3 / m4a / wav…）</div>
+        <div class="name" id="audioName"></div>
+        <input type="file" id="audioInput" accept="audio/*" hidden>
+      </div>
+    </div>
+    <div class="msg" id="loadMsg"></div>
+    <div style="margin-top:14px;">
+      <button class="primary" id="btnLoad" disabled>載入並前往下一步 →</button>
+    </div>
+  </section>
+
+  <!-- STEP 2 -->
+  <section class="card disabled" id="card2">
+    <h2>2 · 邊聽邊點換頁</h2>
+    <p class="pageinfo">播放錄音，每當你要「換到下一頁」時就按一下 <b>下一頁</b>（或按 <kbd>Enter</kbd>）。共有 <b id="pageTotal">–</b> 頁，需要按 <b id="cueNeeded">–</b> 次換頁。</p>
+    <div class="previewbox" id="previewBox"><canvas id="previewCanvas"></canvas></div>
+    <audio id="audioEl" controls></audio>
+    <div class="cue-controls">
+      <button class="primary big" id="btnNext">下一頁 ▶（目前第 <span id="curPage">1</span> 頁）</button>
+      <button id="btnUndo">↩ 復原上一次</button>
+      <button id="btnReset">重設</button>
+    </div>
+    <div class="msg" id="cueMsg"></div>
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer; color:var(--muted); font-size:13px;">微調每頁開始時間（可手動編輯，單位秒）</summary>
+      <table id="timeTable"><thead><tr><th>頁</th><th>開始時間 (秒)</th><th>= 時間碼</th></tr></thead><tbody></tbody></table>
+    </details>
+    <div style="margin-top:16px;">
+      <button class="primary" id="btnToExport" disabled>前往輸出 →</button>
+    </div>
+  </section>
+
+  <!-- STEP 3 -->
+  <section class="card disabled" id="card3">
+    <h2>3 · 輸出影片</h2>
+    <div class="opts">
+      <label>解析度<select id="resSel">
+        <option value="1920x1080" selected>1080p (1920×1080)</option>
+        <option value="1280x720">720p (1280×720)</option>
+      </select></label>
+      <label>FPS<select id="fpsSel">
+        <option value="30" selected>30</option>
+        <option value="24">24</option>
+        <option value="15">15</option>
+      </select></label>
+    </div>
+    <div class="msg warn show" style="margin-bottom:14px;">
+      <b>兩種輸出方式：</b><br>
+      🅐 <b>瀏覽器即時錄製 WebM</b>（下方）——不用裝任何東西，但 N 分鐘錄音要花約 N 分鐘錄。<br>
+      🅑 <b>本機快速壓 MP4</b>（推薦）——按下面「⬇ 匯出時間表 JSON」，再跑
+      <code>python make_video.py 簡報.pdf 錄音檔 timeline.json</code>，用 ffmpeg 秒出 MP4。
+    </div>
+    <div style="margin-bottom:16px;">
+      <button class="primary" id="btnExportTimeline">⬇ 匯出時間表 JSON（給 make_video.py）</button>
+      <span class="hint" id="exportHint"></span>
+    </div>
+    <hr style="border:none; border-top:1px solid var(--line); margin:18px 0;">
+    <p class="hint">🅐 以下是「即時錄製」：會實際播放整段錄音一次來錄影，所以 <b>N 分鐘的錄音就要花約 N 分鐘</b>。錄製過程請保持此分頁在前景、不要切走。</p>
+    <div class="previewbox" id="renderBox"><canvas id="renderCanvas"></canvas></div>
+    <div class="progress"><div id="progBar"></div></div>
+    <div class="cue-controls">
+      <button class="primary big" id="btnRender">🎬 開始錄製</button>
+      <button id="btnCancel" disabled>取消</button>
+      <span class="pageinfo" id="renderStat"></span>
+    </div>
+    <div class="msg" id="renderMsg"></div>
+    <div id="dlWrap"></div>
+  </section>
+</div>
+
+<script src="vendor/pdf.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---- pdf.js worker (vendored locally; no CDN / no network needed) ----
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
+  }
+
+  // ---- state ----
+  var state = {
+    pdfFile: null,
+    audioFile: null,
+    pages: [],        // array of {canvas, w, h}
+    numPages: 0,
+    audioUrl: null,
+    duration: 0,
+    pageStarts: [0],  // start time (sec) of each page; index 0 fixed at 0
+    curPage: 0,       // page index currently shown in cueing
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  function fmt(t) {
+    if (!isFinite(t)) return "–";
+    t = Math.max(0, t);
+    var m = Math.floor(t / 60), s = t - m * 60;
+    return m + ":" + (s < 10 ? "0" : "") + s.toFixed(1);
+  }
+  function showMsg(el, text, cls) {
+    el.textContent = text;
+    el.className = "msg show " + (cls || "");
+  }
+  function hideMsg(el) { el.className = "msg"; }
+
+  // =========================================================
+  // STEP 1: file loading
+  // =========================================================
+  function wireDrop(dropEl, inputEl, accept, onFile) {
+    dropEl.addEventListener("click", function () { inputEl.click(); });
+    inputEl.addEventListener("change", function () {
+      if (inputEl.files && inputEl.files[0]) onFile(inputEl.files[0]);
+    });
+    ["dragenter", "dragover"].forEach(function (ev) {
+      dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.add("over"); });
+    });
+    ["dragleave", "drop"].forEach(function (ev) {
+      dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove("over"); });
+    });
+    dropEl.addEventListener("drop", function (e) {
+      var f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) onFile(f);
+    });
+  }
+
+  wireDrop($("dropPdf"), $("pdfInput"), "pdf", function (f) {
+    state.pdfFile = f;
+    $("pdfName").textContent = "✓ " + f.name;
+    refreshLoadBtn();
+  });
+  wireDrop($("dropAudio"), $("audioInput"), "audio", function (f) {
+    state.audioFile = f;
+    $("audioName").textContent = "✓ " + f.name;
+    refreshLoadBtn();
+  });
+
+  function refreshLoadBtn() {
+    $("btnLoad").disabled = !(state.pdfFile && state.audioFile);
+  }
+
+  $("btnLoad").addEventListener("click", function () {
+    hideMsg($("loadMsg"));
+    $("btnLoad").disabled = true;
+    showMsg($("loadMsg"), "正在讀取檔案…", "");
+    loadAll().then(function () {
+      enterStep2();
+    }).catch(function (err) {
+      console.error(err);
+      showMsg($("loadMsg"), "載入失敗：" + (err && err.message ? err.message : err), "err");
+      $("btnLoad").disabled = false;
+    });
+  });
+
+  function loadAll() {
+    return Promise.all([loadPdf(state.pdfFile), loadAudio(state.audioFile)]);
+  }
+
+  function loadPdf(file) {
+    if (!window.pdfjsLib) {
+      return Promise.reject(new Error("pdf.js 未載入。請確認 vendor/pdf.min.js 存在，並用網頁伺服器或 GitHub Pages 開啟本頁。"));
+    }
+    return file.arrayBuffer().then(function (buf) {
+      return pdfjsLib.getDocument({ data: buf }).promise;
+    }).then(function (pdf) {
+      state.numPages = pdf.numPages;
+      var tasks = [];
+      for (var i = 1; i <= pdf.numPages; i++) {
+        tasks.push(renderPdfPage(pdf, i));
+      }
+      return Promise.all(tasks);
+    }).then(function (pages) {
+      state.pages = pages;
+    });
+  }
+
+  // Render one PDF page to an offscreen canvas sized to fit ~1920px wide.
+  function renderPdfPage(pdf, num) {
+    return pdf.getPage(num).then(function (page) {
+      var base = page.getViewport({ scale: 1 });
+      var targetW = 1920;
+      var scale = Math.min(targetW / base.width, 4); // cap upscaling
+      if (scale <= 0 || !isFinite(scale)) scale = 1;
+      var vp = page.getViewport({ scale: scale });
+      var canvas = document.createElement("canvas");
+      canvas.width = Math.round(vp.width);
+      canvas.height = Math.round(vp.height);
+      var ctx = canvas.getContext("2d");
+      return page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+        return { canvas: canvas, w: canvas.width, h: canvas.height };
+      });
+    });
+  }
+
+  function loadAudio(file) {
+    return new Promise(function (resolve, reject) {
+      if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+      state.audioUrl = URL.createObjectURL(file);
+      var a = $("audioEl");
+      a.src = state.audioUrl;
+      a.onloadedmetadata = function () {
+        state.duration = a.duration;
+        resolve();
+      };
+      a.onerror = function () { reject(new Error("無法讀取音檔（格式可能不支援）")); };
+    });
+  }
+
+  // =========================================================
+  // STEP 2: cueing
+  // =========================================================
+  function enterStep2() {
+    $("card1").classList.add("disabled");
+    $("card2").classList.remove("disabled");
+    $("chip1").className = "step-chip done";
+    $("chip2").className = "step-chip active";
+    $("pageTotal").textContent = state.numPages;
+    $("cueNeeded").textContent = Math.max(0, state.numPages - 1);
+    state.pageStarts = [0];
+    state.curPage = 0;
+    drawPreview(0);
+    updateCueUi();
+    buildTimeTable();
+    $("card2").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function drawPreview(idx) {
+    var pg = state.pages[idx];
+    if (!pg) return;
+    var c = $("previewCanvas");
+    c.width = pg.w; c.height = pg.h;
+    c.getContext("2d").drawImage(pg.canvas, 0, 0);
+  }
+
+  var audioEl = $("audioEl");
+
+  $("btnNext").addEventListener("click", cueNext);
+  $("btnUndo").addEventListener("click", cueUndo);
+  $("btnReset").addEventListener("click", cueReset);
+
+  function cueNext() {
+    if (state.pageStarts.length >= state.numPages) {
+      showMsg($("cueMsg"), "已經標記到最後一頁了。多餘的換頁不會被記錄。", "warn");
+      return;
+    }
+    var t = audioEl.currentTime;
+    var last = state.pageStarts[state.pageStarts.length - 1];
+    if (t <= last) t = last + 0.01; // keep strictly increasing
+    state.pageStarts.push(t);
+    state.curPage = state.pageStarts.length - 1;
+    drawPreview(state.curPage);
+    updateCueUi();
+    buildTimeTable();
+  }
+
+  function cueUndo() {
+    if (state.pageStarts.length > 1) {
+      state.pageStarts.pop();
+      state.curPage = state.pageStarts.length - 1;
+      drawPreview(state.curPage);
+      updateCueUi();
+      buildTimeTable();
+    }
+  }
+
+  function cueReset() {
+    state.pageStarts = [0];
+    state.curPage = 0;
+    drawPreview(0);
+    updateCueUi();
+    buildTimeTable();
+    hideMsg($("cueMsg"));
+  }
+
+  function updateCueUi() {
+    $("curPage").textContent = state.curPage + 1;
+    var cued = state.pageStarts.length;
+    $("btnToExport").disabled = false; // always allow; tail is auto-filled
+    if (cued < state.numPages) {
+      showMsg($("cueMsg"),
+        "已標記 " + cued + " / " + state.numPages + " 頁。若在錄音結束前沒標記完，剩下的頁面會平均分配到結尾。",
+        "warn");
+    } else {
+      showMsg($("cueMsg"), "全部 " + state.numPages + " 頁都標記好了 ✓", "ok");
+    }
+  }
+
+  // Editable per-page start-time table
+  function buildTimeTable() {
+    var tbody = $("timeTable").querySelector("tbody");
+    tbody.innerHTML = "";
+    var starts = buildTimeline();
+    for (var i = 0; i < state.numPages; i++) {
+      var tr = document.createElement("tr");
+      var isCued = i < state.pageStarts.length;
+      tr.innerHTML =
+        "<td>" + (i + 1) + (isCued ? "" : " <span style='color:var(--muted)'>(自動)</span>") + "</td>" +
+        "<td><input type='number' step='0.1' min='0' data-idx='" + i + "' " +
+          (i === 0 ? "disabled" : "") + " value='" + starts[i].toFixed(1) + "'></td>" +
+        "<td class='pageinfo'>" + fmt(starts[i]) + "</td>";
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll("input").forEach(function (inp) {
+      inp.addEventListener("change", function () {
+        var idx = parseInt(inp.getAttribute("data-idx"), 10);
+        var v = parseFloat(inp.value);
+        if (isNaN(v)) return;
+        // Ensure the pageStarts array is long enough and set the value.
+        while (state.pageStarts.length <= idx) {
+          state.pageStarts.push(state.pageStarts[state.pageStarts.length - 1]);
+        }
+        state.pageStarts[idx] = v;
+        // keep monotonic non-decreasing
+        for (var k = 1; k < state.pageStarts.length; k++) {
+          if (state.pageStarts[k] < state.pageStarts[k - 1]) {
+            state.pageStarts[k] = state.pageStarts[k - 1];
+          }
+        }
+        buildTimeTable();
+      });
+    });
+  }
+
+  // Produce a full length-numPages array of start times, filling any
+  // un-cued tail pages by spreading them evenly to the audio end.
+  function buildTimeline() {
+    var starts = state.pageStarts.slice(0, state.numPages);
+    if (starts.length < state.numPages) {
+      var lastStart = starts[starts.length - 1];
+      var remainingPages = state.numPages - starts.length;
+      var span = Math.max(0, state.duration - lastStart);
+      var step = span / (remainingPages + 1);
+      for (var i = 0; i < remainingPages; i++) {
+        starts.push(lastStart + step * (i + 1));
+      }
+    }
+    // clamp + monotonic
+    for (var k = 0; k < starts.length; k++) {
+      if (starts[k] > state.duration) starts[k] = state.duration;
+      if (k > 0 && starts[k] < starts[k - 1]) starts[k] = starts[k - 1];
+    }
+    return starts;
+  }
+
+  // Keyboard: space play/pause, Enter / ArrowRight = next page
+  document.addEventListener("keydown", function (e) {
+    if ($("card2").classList.contains("disabled")) return;
+    var tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "select" || tag === "textarea") return;
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (audioEl.paused) audioEl.play(); else audioEl.pause();
+    } else if (e.code === "Enter" || e.code === "ArrowRight") {
+      e.preventDefault();
+      cueNext();
+    }
+  });
+
+  $("btnToExport").addEventListener("click", enterStep3);
+
+  // =========================================================
+  // STEP 3: render / export
+  // =========================================================
+  var rendering = false, cancelRequested = false;
+
+  function enterStep3() {
+    $("card2").classList.add("disabled");
+    $("card3").classList.remove("disabled");
+    $("chip2").className = "step-chip done";
+    $("chip3").className = "step-chip active";
+    $("card3").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Export the cued timeline as JSON for the local ffmpeg script (make_video.py)
+  $("btnExportTimeline").addEventListener("click", function () {
+    var res = $("resSel").value;
+    var data = {
+      pdf: state.pdfFile ? state.pdfFile.name : "",
+      audio: state.audioFile ? state.audioFile.name : "",
+      numPages: state.numPages,
+      duration: Math.round(state.duration * 1000) / 1000,
+      res: res,
+      pageStarts: buildTimeline().map(function (t) { return Math.round(t * 1000) / 1000; })
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "timeline.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    $("exportHint").textContent = "已下載 timeline.json（" + state.numPages + " 頁）";
+  });
+
+  $("btnCancel").addEventListener("click", function () { cancelRequested = true; });
+
+  $("btnRender").addEventListener("click", function () {
+    if (rendering) return;
+    startRender().catch(function (err) {
+      console.error(err);
+      showMsg($("renderMsg"), "錄製失敗：" + (err && err.message ? err.message : err), "err");
+      finishRenderUi();
+    });
+  });
+
+  function pickMime() {
+    var opts = [
+      "video/webm;codecs=vp9,opus",
+      "video/webm;codecs=vp8,opus",
+      "video/webm"
+    ];
+    for (var i = 0; i < opts.length; i++) {
+      if (window.MediaRecorder && MediaRecorder.isTypeSupported(opts[i])) return opts[i];
+    }
+    return "";
+  }
+
+  function startRender() {
+    var mime = pickMime();
+    if (!mime) return Promise.reject(new Error("此瀏覽器不支援 MediaRecorder / WebM 錄製，請改用 Chrome 或 Edge。"));
+
+    var timeline = buildTimeline();
+    var res = $("resSel").value.split("x");
+    var W = parseInt(res[0], 10), H = parseInt(res[1], 10);
+    var fps = parseInt($("fpsSel").value, 10);
+
+    var canvas = $("renderCanvas");
+    canvas.width = W; canvas.height = H;
+    var ctx = canvas.getContext("2d");
+
+    // Audio graph -> capturable audio track (+ audible monitor)
+    var AudioCtx = window.AudioContext || window.webkitAudioContext;
+    var actx = new AudioCtx();
+    if (!audioEl._srcNode) {
+      audioEl._srcNode = actx.createMediaElementSource(audioEl);
+    }
+    var srcNode = audioEl._srcNode;
+    var dest = actx.createMediaStreamDestination();
+    try { srcNode.connect(dest); } catch (e) {}
+    try { srcNode.connect(actx.destination); } catch (e) {}
+
+    var vStream = canvas.captureStream(fps);
+    var stream = new MediaStream();
+    vStream.getVideoTracks().forEach(function (t) { stream.addTrack(t); });
+    dest.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+
+    var recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
+    var chunks = [];
+    recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+
+    rendering = true; cancelRequested = false;
+    $("btnRender").disabled = true;
+    $("btnCancel").disabled = false;
+    $("dlWrap").innerHTML = "";
+    hideMsg($("renderMsg"));
+    showMsg($("renderMsg"), "錄製中…請勿切換到其他分頁。", "");
+
+    function drawFrame() {
+      // letterbox current page onto WxH canvas
+      var t = audioEl.currentTime;
+      var idx = 0;
+      for (var i = 0; i < timeline.length; i++) {
+        if (t >= timeline[i] - 1e-6) idx = i;
+      }
+      var pg = state.pages[idx];
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+      if (pg) {
+        var scale = Math.min(W / pg.w, H / pg.h);
+        var dw = pg.w * scale, dh = pg.h * scale;
+        ctx.drawImage(pg.canvas, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      }
+      var pct = state.duration ? Math.min(1, t / state.duration) : 0;
+      $("progBar").style.width = (pct * 100) + "%";
+      $("renderStat").textContent = "第 " + (idx + 1) + "/" + state.numPages + " 頁 · " +
+        fmt(t) + " / " + fmt(state.duration);
+    }
+
+    return new Promise(function (resolve, reject) {
+      var rafId;
+      function loop() {
+        drawFrame();
+        if (cancelRequested) { stop(true); return; }
+        rafId = requestAnimationFrame(loop);
+      }
+      function stop(canceled) {
+        cancelAnimationFrame(rafId);
+        audioEl.pause();
+        try { recorder.stop(); } catch (e) {}
+        try { srcNode.disconnect(dest); } catch (e) {}
+        if (canceled) {
+          recorder.onstop = function () {
+            finishRenderUi();
+            showMsg($("renderMsg"), "已取消。", "warn");
+            resolve();
+          };
+        }
+      }
+
+      recorder.onstop = function () {
+        if (cancelRequested) return; // handled above
+        finishRenderUi();
+        var blob = new Blob(chunks, { type: mime.split(";")[0] });
+        var url = URL.createObjectURL(blob);
+        var name = (state.pdfFile.name || "slides").replace(/\.pdf$/i, "") + ".webm";
+        var a = document.createElement("a");
+        a.href = url; a.download = name; a.className = "dl";
+        a.innerHTML = "<button class='primary big'>⬇ 下載影片（" + name + "，" +
+          (blob.size / 1048576).toFixed(1) + " MB）</button>";
+        $("dlWrap").appendChild(a);
+        var vid = document.createElement("video");
+        vid.src = url; vid.controls = true; vid.style.cssText = "width:100%;margin-top:12px;border-radius:8px;";
+        $("dlWrap").appendChild(vid);
+        showMsg($("renderMsg"), "完成 ✓ 可以下載或直接預覽。", "ok");
+        resolve();
+      };
+
+      audioEl.onended = function () { stop(false); };
+
+      // start
+      audioEl.currentTime = 0;
+      if (actx.state === "suspended") actx.resume();
+      recorder.start(200);
+      var p = audioEl.play();
+      if (p && p.catch) p.catch(function (err) { reject(err); });
+      loop();
+    });
+  }
+
+  function finishRenderUi() {
+    rendering = false;
+    $("btnRender").disabled = false;
+    $("btnCancel").disabled = true;
+  }
+
+})();
+</script>
+</body>
+</html>
