@@ -43,8 +43,19 @@ python make_video.py 簡報.pdf 上半.m4a 下半.m4a timeline.json
 需求：`ffmpeg` / `ffprobe`（全域可用）、`pypdfium2`、`Pillow`（`pip install pypdfium2 Pillow`）。
 輸出為 H.264 + AAC 的 MP4，YouTube／各播放器通用，比即時錄製快非常多。
 
+### 🌏 地球演化：板塊漂移與生物 (`earth-evolution.html`)
+
+一顆會自轉的地球，從 **46 億年前的冥古宙** 一路播放到現在，用來上課時當背景動畫或讓學生自己拉著玩。
+
+- 陸塊隨年代**聚合又裂解**（盤古大陸 → 大西洋張開 → 印度北漂），海洋顏色、冰帽範圍也跟著變。
+- 右側同步顯示該年代的**地質事件**與**當時的生物**（三葉蟲、恐龍、猛獁象……皆為手繪 SVG 圖示）。
+- 可**暫停**、拖**時間軸**跳到任一年代；播到第四紀會用紅點標出**台灣**——約 600 萬年前蓬萊造山運動才讓它浮出海面。
+
+> 板塊位置為教學用示意，非古地理學精確重建。
+
 ## 技術
 
 - PDF 在瀏覽器端以 [pdf.js](https://github.com/mozilla/pdf.js)（已 vendored 於 `vendor/`）渲染；`make_video.py` 端則用 `pypdfium2` 渲染。
 - WebM 以瀏覽器原生 `<canvas>.captureStream()` + `MediaRecorder` 即時合成，無需後端。
 - MP4 由 `make_video.py`：`pypdfium2` 把每頁 letterbox 成圖 → ffmpeg concat（每頁帶自己的時長）+ 音軌 → H.264/AAC。
+- `earth-evolution.html` 為單檔純 JS + `<canvas>`（正射投影自繪地球，無任何函式庫、無外部資源），可直接離線開啟。

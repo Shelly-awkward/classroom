@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>地球演化：板塊漂移與生物</title>
+<style>
+  :root{ --tx:#2c2c2a; --t2:#5f5e5a; --t3:#8a8983; --bd:#e2e0d9; --bg:#faf9f5; }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px;background:var(--bg);color:var(--tx);
+       font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+       line-height:1.7;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:720px;margin:0 auto}
+  h1{font-size:22px;font-weight:500;margin:0 0 4px}
+  .sub{font-size:13px;color:var(--t3);margin:0 0 20px}
+  .row{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+  .globe{width:300px;flex:0 0 300px}
+  canvas{width:300px;height:300px;display:block;border-radius:50%}
+  .panel{flex:1;min-width:260px}
+  .era{font-size:22px;font-weight:500}
+  .ma{font-size:13px;color:var(--t3);margin-top:2px}
+  .geo{font-size:14px;color:var(--t2);margin-top:10px}
+  .lbl{font-size:13px;color:var(--t3);margin-top:16px}
+  .life{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+  .life div{display:flex;align-items:center;gap:6px}
+  .life span{font-size:13px;color:var(--t2)}
+  .ctrl{display:flex;align-items:center;gap:12px;margin-top:18px}
+  button{font:inherit;font-size:14px;padding:7px 16px;border:1px solid #b9b7ae;
+         background:transparent;color:var(--tx);border-radius:8px;cursor:pointer}
+  button:hover{background:#f0eee7}
+  input[type=range]{flex:1;accent-color:#5f5e5a}
+  .note{font-size:12px;color:var(--t3);margin-top:24px;border-top:1px solid var(--bd);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>地球演化：板塊漂移與生物</h1>
+  <p class="sub">從 46 億年前的冥古宙到現在。板塊位置為示意圖，非古地理學精確重建。</p>
+
+  <div class="row">
+    <div class="globe"><canvas id="gl" width="600" height="600"></canvas></div>
+    <div class="panel">
+      <div class="era" id="en">冥古宙</div>
+      <div class="ma" id="ma">距今 4600 百萬年</div>
+      <div class="geo" id="ge"></div>
+      <div class="lbl">當時的生物</div>
+      <div class="life" id="lf"></div>
+    </div>
+  </div>
+
+  <div class="ctrl">
+    <button id="pb">暫停</button>
+    <input type="range" id="sl" min="0" max="1300" step="1" value="0" aria-label="地質年代時間軸">
+  </div>
+
+  <p class="note">拉動時間軸可跳到任一年代。拉到最後（第四紀）會看到紅點標出台灣——約 600 萬年前蓬萊造山運動才讓它浮出海面。</p>
+</div>
+
+<script>
+(function(){
+var E=[
+ {n:"冥古宙",a:4600,b:4000,g:"地球剛形成，表面是岩漿海，沒有穩定陸塊，也還沒有海洋。",l:[]},
+ {n:"太古宙",a:4000,b:2500,g:"海洋出現，最早的小型陸核浮現，開始有板塊運動的雛形。",l:[["mic","單細胞細菌"],["stro","疊層石（藍綠菌）"]]},
+ {n:"元古宙 前中期",a:2500,b:1000,g:"藍綠菌製造大量氧氣（大氧化事件），陸核合併成超大陸。",l:[["stro","藍綠菌大量繁殖"],["mic","真核細胞出現"]]},
+ {n:"元古宙 晚期",a:1000,b:541,g:"羅迪尼亞超大陸裂解，地球一度全球結冰（雪球地球）。",l:[["ice","雪球地球"],["edia","埃迪卡拉軟軀體生物"]]},
+ {n:"寒武紀",a:541,b:485,g:"陸塊分散在赤道附近，淺海面積大增。",l:[["tri","三葉蟲"],["edia","各式海洋無脊椎動物"]]},
+ {n:"奧陶紀–志留紀",a:485,b:419,g:"岡瓦納大陸漂向南極，海平面高、淺海廣布。",l:[["fish","最早的魚類"],["tri","筆石、珊瑚礁"],["plant","植物開始登陸"]]},
+ {n:"泥盆紀",a:419,b:359,g:"北美與波羅地碰撞形成歐美大陸，造出大山脈。",l:[["fish","魚類的時代"],["amph","四足動物爬上陸地"],["tree","最早的森林"]]},
+ {n:"石炭紀",a:359,b:299,g:"赤道帶大片沼澤森林，日後變成煤層；盤古大陸開始拼合。",l:[["tree","巨大蕨類森林"],["bug","巨型蜻蜓"],["amph","兩生類繁盛"]]},
+ {n:"二疊紀",a:299,b:252,g:"所有陸塊合成一整塊「盤古大陸」，內陸極度乾燥。末期發生史上最大滅絕。",l:[["rept","似哺乳爬行類"],["tree","針葉樹"]]},
+ {n:"三疊紀",a:252,b:201,g:"盤古大陸開始出現裂縫，大西洋雛形誕生。",l:[["dino","最早的恐龍"],["mamm","最早的哺乳類"]]},
+ {n:"侏羅紀",a:201,b:145,g:"盤古大陸正式裂成南北兩塊，海水灌入新生的大西洋。",l:[["dino","恐龍全盛"],["bird","鳥類出現"]]},
+ {n:"白堊紀",a:145,b:66,g:"南美與非洲分家，印度板塊向北狂奔。末期隕石撞擊，恐龍滅絕。",l:[["dino","大型恐龍"],["flower","開花植物"],["bird","鳥類多樣化"]]},
+ {n:"古近紀–新近紀",a:66,b:2.6,g:"印度撞上歐亞板塊擠出喜馬拉雅；約 600 萬年前菲律賓海板塊擠壓，台灣島開始隆起。",l:[["mamm","哺乳類接手陸地"],["flower","草原擴張"],["bird","現代鳥類"]]},
+ {n:"第四紀（更新世–全新世）",a:2.6,b:0,g:"反覆的冰河期，海平面大起大落；台灣曾多次與大陸相連。",l:[["ice","冰河期"],["mammoth","猛獁象"],["human","人類"]]}
+];
+var IC={
+ mic:'<circle cx="12" cy="12" r="6"/><path d="M9 11h6M10 14h4"/>',
+ stro:'<path d="M3 21h18M5 21a7 7 0 0 1 14 0M8 21a4 4 0 0 1 8 0"/>',
+ edia:'<path d="M12 21V7M12 12l4-3M12 12l-4-3M12 16l4-3M12 16l-4-3M12 7c0-3 3-4 3-4M12 7c0-3-3-4-3-4"/>',
+ tri:'<ellipse cx="12" cy="12" rx="5" ry="8"/><path d="M7 9h10M7 12h10M7 15h10"/>',
+ fish:'<path d="M4 12c3-5 10-5 13 0-3 5-10 5-13 0z"/><path d="M17 12l4-3v6z"/><circle cx="8" cy="11" r=".9"/>',
+ plant:'<path d="M12 21V9M12 13c-4 0-5-4-5-4s4-1 5 4zM12 11c4 0 5-4 5-4s-4-1-5 4z"/>',
+ tree:'<path d="M12 21v-6M6 15h12L12 3z"/>',
+ bug:'<ellipse cx="12" cy="12" rx="1.4" ry="7"/><path d="M11 8c-4-3-7-2-7-2s2 4 7 4M13 8c4-3 7-2 7-2s-2 4-7 4M11 14c-4-2-6 0-6 0s2 3 6 2M13 14c4-2 6 0 6 0s-2 3-6 2"/>',
+ amph:'<ellipse cx="12" cy="13" rx="5" ry="3"/><circle cx="12" cy="7" r="2.4"/><path d="M7 11L3 8M17 11l4-3M7 15l-4 3M17 15l4 3"/>',
+ rept:'<ellipse cx="11" cy="13" rx="6" ry="3"/><circle cx="18" cy="10" r="2.2"/><path d="M5 13c-3 0-4 3-4 3M7 16v4M14 16v4"/>',
+ dino:'<path d="M2 20c1-3 3-4 5-4 3 0 5-1 6-4 1-3 3-4 5-4 1 0 2 1 2 2 0 2-2 2-2 2"/><path d="M7 16v5M12 15v6"/>',
+ bird:'<path d="M3 14c3-4 5-4 6-1 1-3 4-5 8-4-2 1-3 3-4 5-2 4-8 4-10 0z"/>',
+ flower:'<circle cx="12" cy="9" r="2"/><path d="M12 21v-10M12 7c0-3 3-3 3-1s-3 1-3 1M12 7c0-3-3-3-3-1s3 1 3 1M14 10c3-1 4 2 2 3s-2-3-2-3M10 10c-3-1-4 2-2 3s2-3 2-3"/>',
+ mamm:'<ellipse cx="11" cy="12" rx="6" ry="3.2"/><circle cx="18" cy="9" r="2.2"/><path d="M7 15v5M14 15v5M5 12c-2 0-3-2-3-2M18 7l1-2"/>',
+ mammoth:'<path d="M5 19c-1-4 1-8 5-8s6 3 6 6v2"/><circle cx="17" cy="9" r="3"/><path d="M17 12c-1 3-4 3-4 3M20 10c2 2 1 5 1 5M7 19v3M13 19v3"/>',
+ human:'<circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M12 15l-3 6M12 15l3 6M8 11l4-2 4 2"/>',
+ ice:'<path d="M12 3v18M4 8l16 8M20 8L4 16"/>'
+};
+var P=[
+{c:"#a3925f",lon:[0,-30,-20,-10,-40,-50,-30,-15,-10,-15,-35,-60,-85,-100],lat:[0,0,5,10,-5,0,5,5,10,15,25,30,40,45],s:[0,.30,.45,.55,.65,.65,.70,.75,.80,.80,.82,.85,.90,.92]},
+{c:"#9c8a58",lon:[0,40,45,30,20,15,10,5,20,25,40,60,80,90],lat:[0,-20,-10,20,-40,-25,0,10,20,25,30,35,45,50],s:[0,.28,.42,.52,.58,.62,.68,.78,.88,.92,.96,1.0,1.05,1.05]},
+{c:"#96864f",lon:[0,90,95,80,100,95,80,55,45,50,65,80,100,110],lat:[0,20,25,40,30,40,45,45,50,55,60,60,62,63],s:[0,.24,.34,.40,.44,.48,.52,.58,.60,.60,.60,.60,.60,.60]},
+{c:"#af9a63",lon:[0,0,0,-20,30,25,20,10,5,5,10,15,20,20],lat:[0,-50,-45,-40,-50,-45,-35,-25,-15,-10,-5,0,5,5],s:[0,.30,.50,.70,.88,.90,.90,.90,.90,.90,.90,.90,.90,.90]},
+{c:"#a08d55",lon:[0,-40,-35,-45,-10,-15,-20,-25,-30,-30,-35,-45,-60,-65],lat:[0,-60,-60,-55,-65,-60,-55,-45,-35,-30,-25,-20,-15,-15],s:[0,.22,.38,.58,.78,.80,.80,.80,.80,.80,.80,.80,.84,.84]},
+{c:"#8f8050",lon:[0,20,20,25,35,35,40,45,45,40,35,30,10,0],lat:[0,-78,-80,-80,-80,-80,-80,-78,-78,-78,-78,-75,-80,-85],s:[0,.18,.30,.45,.60,.62,.64,.66,.68,.70,.72,.74,.78,.80]},
+{c:"#b09c66",lon:[0,60,60,60,65,70,75,80,85,85,90,95,120,135],lat:[0,-72,-72,-70,-72,-70,-68,-66,-64,-62,-60,-58,-35,-27],s:[0,.12,.20,.30,.38,.40,.42,.44,.46,.48,.50,.52,.55,.55]},
+{c:"#c0a970",lon:[0,50,50,50,55,55,58,60,60,58,58,60,75,78],lat:[0,-58,-58,-55,-60,-58,-55,-50,-45,-42,-42,-40,-5,20],s:[0,.10,.16,.26,.32,.34,.36,.38,.40,.40,.40,.40,.40,.40]}
+];
+var SH=[];
+for(var p=0;p<P.length;p++){var v=[],sd=p*37+11;
+ for(var k=0;k<14;k++){sd=(sd*9301+49297)%233280;var r=0.75+0.55*(sd/233280);v.push([k/14*Math.PI*2,r]);}
+ SH.push(v);}
+var OC=[[190,70,45],[70,95,105],[36,110,175],[52,120,185],[36,110,175],[36,110,175],[36,110,175],[36,110,175],[36,110,175],[36,110,175],[36,110,175],[36,110,175],[34,105,170],[32,100,165]];
+var ICE=[0,0,0,.9,.1,.15,.1,.15,.15,.05,.05,.05,.15,.55];
+var cv=document.getElementById("gl"),cx=cv.getContext("2d"),R=260,CX=300,CY=300,rot=0,tf=0,play=true;
+var sl=document.getElementById("sl"),pb=document.getElementById("pb");
+function lerp(a,b,t){return a+(b-a)*t}
+function proj(lo,la,r0){var l=(lo-rot)*Math.PI/180,f=la*Math.PI/180,f0=0.35;
+ var cosc=Math.sin(f0)*Math.sin(f)+Math.cos(f0)*Math.cos(f)*Math.cos(l);
+ if(cosc<=0)return null;
+ return [CX+r0*Math.cos(f)*Math.sin(l),CY-r0*(Math.cos(f0)*Math.sin(f)-Math.sin(f0)*Math.cos(f)*Math.cos(l))];}
+function draw(){
+ var i=Math.min(13,Math.floor(tf)),j=Math.min(13,i+1),t=tf-i;
+ var o1=OC[i],o2=OC[j],col="rgb("+Math.round(lerp(o1[0],o2[0],t))+","+Math.round(lerp(o1[1],o2[1],t))+","+Math.round(lerp(o1[2],o2[2],t))+")";
+ cx.clearRect(0,0,600,600);
+ cx.beginPath();cx.arc(CX,CY,R,0,7);cx.fillStyle=col;cx.fill();
+ for(var p=0;p<P.length;p++){
+  var s=lerp(P[p].s[i],P[p].s[j],t);if(s<0.02)continue;
+  var lo=lerp(P[p].lon[i],P[p].lon[j],t),la=lerp(P[p].lat[i],P[p].lat[j],t);
+  cx.beginPath();var st=false;
+  for(var k=0;k<=14;k++){var vv=SH[p][k%14],ang=vv[0],rr=vv[1]*26*s;
+   var pla=la+Math.sin(ang)*rr,plo=lo+Math.cos(ang)*rr/Math.max(0.35,Math.cos(pla*Math.PI/180));
+   if(pla>88)pla=88;if(pla<-88)pla=-88;
+   var q=proj(plo,pla,R);if(!q){st=false;continue}
+   if(!st){cx.moveTo(q[0],q[1]);st=true}else cx.lineTo(q[0],q[1]);}
+  cx.closePath();cx.fillStyle=P[p].c;cx.fill();}
+ var ic=lerp(ICE[i],ICE[j],t);
+ if(ic>0.02){cx.save();cx.beginPath();cx.arc(CX,CY,R,0,7);cx.clip();cx.fillStyle="rgba(255,255,255,0.88)";
+  var h=R*ic*1.2;cx.fillRect(0,0,600,CY-R+h);cx.fillRect(0,CY+R-h,600,h);cx.restore();}
+ if(tf>12.55){var q=proj(121,23.5,R);if(q){cx.beginPath();cx.arc(q[0],q[1],7,0,7);cx.fillStyle="#e24b4a";cx.fill();
+  cx.font="500 22px sans-serif";cx.fillStyle="#e24b4a";cx.fillText("台灣",q[0]+12,q[1]+8);}}
+ cx.beginPath();cx.arc(CX,CY,R,0,7);cx.strokeStyle="rgba(255,255,255,0.35)";cx.lineWidth=3;cx.stroke();
+}
+function info(){
+ var i=Math.min(13,Math.floor(tf)),t=tf-i,e=E[i];
+ document.getElementById("en").textContent=e.n;
+ var ma=lerp(e.a,e.b,t);
+ document.getElementById("ma").textContent="距今 "+(ma>=10?Math.round(ma):ma.toFixed(1))+" 百萬年";
+ document.getElementById("ge").textContent=e.g;
+ var h="";for(var k=0;k<e.l.length;k++){h+='<div><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2c2c2a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'+IC[e.l[k][0]]+'</svg><span>'+e.l[k][1]+'</span></div>';}
+ if(!h)h='<span style="font-size:13px;color:#8a8983">還沒有生命</span>';
+ document.getElementById("lf").innerHTML=h;
+}
+var last=0;
+function loop(ts){
+ rot+=0.22;
+ if(play){tf+=0.0038;if(tf>13.999){tf=13.999;play=false;pb.textContent="重播";}
+  sl.value=Math.round(tf*100);}
+ draw();
+ if(ts-last>120){info();last=ts}
+ requestAnimationFrame(loop);
+}
+sl.addEventListener("input",function(){tf=sl.value/100;play=false;pb.textContent="播放";info()});
+pb.addEventListener("click",function(){if(tf>=13.99)tf=0;play=!play;pb.textContent=play?"暫停":"播放"});
+info();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
